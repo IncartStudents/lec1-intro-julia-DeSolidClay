@@ -248,46 +248,94 @@ println(data1)
 
 #=
 Перемножить все элементы массива
-- через loop fusion и
-- с помощью reduce
 =#
-
+## - через loop fusion и
+nums = [1, 2, 3, 4, 5]
+@time nums .* nums
+## - с помощью reduce
+nums = [1, 2, 3, 4, 5]
+@time reduce(*, nums)
+##
 #=
 Написать функцию от одного аргумента и запустить ее по всем элементам массива
-с помощью точки (broadcast)
-c помощью map
-c помощью list comprehension
-указать, чем это лучше явного цикла?
 =#
+nums = [1, 2, 3, 4, 5]
+function sqr(nums)
+    return nums^2
+end
 
+# с помощью точки (broadcast)
+@time sqr.(nums) # 0.028790 seconds (76.53 k allocations: 3.866 MiB)
+
+
+# c помощью map
+@time map(sqr, nums) # 0.019184 seconds (42.22 k allocations: 2.038 MiB)
+
+
+# c помощью list comprehension
+@time [sqr(n) for n in nums] # 0.022971 seconds (41.57 k allocations: 2.005 MiB)
+
+# указать, чем это лучше явного цикла?
+# Такие функции намного компактнее, но при этом не теряют производительности
+##
 # Перемножить вектор-строку [1 2 3] на вектор-столбец [10,20,30] и объяснить результат
-
+# Умножение матриц происходит в соответствии с правилами алгебры
+A = [1 2 3] # 1 x 1
+B = [10, 20, 30] # 3 x 3
+C = A * B 
+В = B * A 
 
 # В одну строку выбрать из массива [1, -2, 2, 3, 4, -5, 0] только четные и положительные числа
-
-
+m = [1, -2, 2, 3, 4, -5, 0]
+l = length(m)
+ans = [n for n in m if (n > 0) && (n % 2 == 0)]'
+##
 # Объяснить следующий код обработки массива names - что за number мы в итоге определили?
 using Random
 Random.seed!(123)
 names = [rand('A':'Z') * '_' * rand('0':'9') * rand([".csv", ".bin"]) for _ in 1:100]
+println(names)
+
 # ---
+#=
 same_names = unique(map(y -> split(y, ".")[1], filter(x -> startswith(x, "A"), names)))
+
 numbers = parse.(Int, map(x -> split(x, "_")[end], same_names))
 numbers_sorted = sort(numbers)
 number = findfirst(n -> !(n in numbers_sorted), 0:9)
-
+## Выбираем уникальные названия файлов без расширения -> Выбираем номера из названий файлов -> Сортируем ->
+## -> Находим индекс первой цифры из массива 0:9, которой нет в номерах файлов, т.е. индекс 2, цифра 1
+=#
+##
 # Упростить этот код обработки:
+using Random
+Random.seed!(123)
+names = [rand('A':'Z') * '_' * rand('0':'9') * rand([".csv", ".bin"]) for _ in 1:100]
+#println(names)
+
+same_names = [parse(Int, n[3]) for n in names if startswith(n, "A")]
+numbers_sorted = [n for n in unique!(sort(same_names))]
+missing_numbers = [n for n in 0:9 if ~(n in numbers_sorted)]
 
 
+##
 #===========================================================================================
 4. Свой тип данных на общих интерфейсах
 =#
-
+##
 #=
 написать свой тип ленивого массива, каждый элемент которого
 вычисляется при взятии индекса (getindex) по формуле (index - 1)^2
 =#
-
+struct LazyArray
+    len::Integer
+end
+function getindex(len::Integer)
+    A = LazyArray(len)
+    return [(i - 1)^2 for i in 1:A.len ]
+end
+println(getindex(6))
+##
 #=
 Написать два типа объектов команд, унаследованных от AbstractCommand,
 которые применяются к массиву:
@@ -295,20 +343,40 @@ number = findfirst(n -> !(n in numbers_sorted), 0:9)
 `ChangeAtCmd(i, val)` - меняет элемент на позиции i на значение val
 Каждая команда имеет конструктор и реализацию метода apply!
 =#
+
 abstract type AbstractCommand end
+struct SortCmd <: AbstractCommand; target::Vector end
+struct ChangeAtCmd <: AbstractCommand; target::Vector; i::Integer; val::Integer end
 apply!(cmd::AbstractCommand, target::Vector) = error("Not implemented for type $(typeof(cmd))")
 
+target = [5, 4, 3, 2, 1]
+target2 = [5, 4, 3, 2, 1]
+
+SortTarget = SortCmd(target2)
+ChangeTarget = ChangeAtCmd(target, 1, 4)
+
+apply!(SortTarget) = sort!(target2.SortTarget)
+apply!(ChangeTarget) = replace!(target, target[ChangeTarget.i] => ChangeTarget.val)
 
 # Аналогичные команды, но без наследования и в виде замыканий (лямбда-функций)
-
-
+i = 1
+val = 10
+Chng = target -> replace!(target, target[i] => val)
+Srt = target -> sort(target)
+Chng(target)
+##
 #===========================================================================================
 5. Тесты: как проверять функции?
 =#
 
 # Написать тест для функции
-
-
+using Test
+nums = [1, 2, 3, 4, 5]
+function sqr(nums)
+    return nums^2
+end
+@test sqr.(nums) == [1, 4, 9, 16, 25]
+##
 #===========================================================================================
 6. Дебаг: как отладить функцию по шагам?
 =#
@@ -316,8 +384,15 @@ apply!(cmd::AbstractCommand, target::Vector) = error("Not implemented for type $
 #=
 Отладить функцию по шагам с помощью макроса @enter и точек останова
 =#
+using Debugger
 
+nums = [1, 2, 3, 4, 5]
+function sqr(nums)
+    return nums^2
+end
+Debugger.@enter sqr.(nums)
 
+##
 #===========================================================================================
 7. Профилировщик: как оценить производительность функции?
 =#
@@ -336,34 +411,77 @@ function generate_data(len)
     vec3 = vec2 .^ 3 .- (sum(vec2) / len)
     return vec3
 end
+ProfileView.@profview generate_data(1_000_000)
 
-@time generate_data(1_000_000);
+##
+# @time generate_data(1_000_000);
+using ProfileView
+
 
 
 # Переписать функцию выше так, чтобы она выполнялась быстрее:
 
-
+function generate_data(len)
+    vec1 = [rand(1:10) for i = 1:len]
+    vec1 = sort!(vec1)
+    vec1 = vec1 .^ 3 .- (sum(vec1) / len)
+    return vec1
+end
+ProfileView.@profview generate_data(1_000_000)
+##
 #===========================================================================================
 8. Отличия от матлаба: приращение массива и предварительная аллокация?
 =#
-
+##
 #=
 Написать функцию определения первой разности, которая принимает и возвращает массив
 и для каждой точки входного (x) и выходного (y) выходного массива вычисляет:
 y[i] = x[i] - x[i-1]
 =#
+X = [2*t for t = 1:100]
+function df(X, Fd)
+    Y = [X[i] - X[i-1] for i = 2:length(X)]
+    Y = Y * Fd
+    return Y
+end
+ProfileView.@profview df(X, 1)
 
+##
 #=
 Аналогичная функция, которая отличается тем, что внутри себя не аллоцирует новый массив y,
 а принимает его первым аргументом, сам массив аллоцируется до вызова функции
 =#
+X = [2*t for t = 1:100]
+Y = zeros(length(X))
+function df!(Y)
+    for i = 2:length(Y)
+        Y[i] = X[i] - X[i-1]
+    end
+end
+ProfileView.@profview df!(Y)
 
+##
 #=
 Написать код, который добавляет элементы в конец массива, в начало массива,
 в середину массива
 =#
-
-
+X = [2*t for t = 1:100]
+Y = [3, 2]
+y = 505
+#println(append!(X, Y))
+#println(append!(Y, X))
+function push_middle(X, y)
+    l = length(X)
+    if l % 2 == 0
+        insert!(X, l/2 + 1, y)
+    else
+        insert!(X, convert(Int64, floor(l / 2)), y)
+    end
+end
+push!(X, 101)
+push_middle(X, y)
+println(X[50])
+##
 #===========================================================================================
 9. Модули и функции: как оборачивать функции внутрь модуля, как их экспортировать
 и пользоваться вне модуля?
@@ -387,39 +505,69 @@ end
 =#
 
 # Что такое environment, как задать его, как его поменять во время работы?
+#= 
+Environment в Julia — это коллекция пакетов, настраивается с помощью Pkg
+=#
 
 # Что такое пакет (package), как добавить новый пакет?
+#=
+Пакет - это коллекция модулей, обычно с дополнительной документацией и тестами.
+Пакеты добавляются через Pkg
+=#
 
 # Как начать разрабатывать чужой пакет?
+#=
+Разработать пакет можно с помощью Pkg, создав новую среду с базовой структурой пакета
+=#
 
 #=
 Как создать свой пакет?
 (необязательно, эксперименты с PkgTemplates проводим вне этого репозитория)
 =#
 
-
+##
 #===========================================================================================
 11. Сохранение переменных в файл и чтение из файла.
 Подключить пакеты JLD2, CSV.
 =#
 
 # Сохранить и загрузить произвольные обхекты в JLD2, сравнить их
+using JLD2
+hello = "world"
+# save_object("example.jld2", hello)
+hi = load_object("example.jld2")
 
+##
 # Сохранить и загрузить табличные объекты (массивы) в CSV, сравнить их
+using CSV, DataFrames
 
+# write out a DataFrame to csv file
+dframe = DataFrame(rand(10, 10), :auto)
+CSV.write("data.csv", dframe)
 
+##
 #===========================================================================================
 12. Аргументы запуска Julia
 =#
 
 #=
 Как задать окружение при запуске?
+Задать окружение можно с помощью аргументов окружения:
+JULIA_NUM_THREADS - установка количества потоков
+JULIA_PROJECT     - путь для окружения
+JULIA_DEPOT_PATH  - путь для установленных пакетов
+JULIA_LOAD_PATH   - путь откуда устанавливаются пакеты
+JULIA_PKG_SERVER  - url сайта с пакетами
+JULIA_EDITOR      - выбор редактора для отладки
+и тд
 =#
 
 #=
 Как задать скрипт, который будет выполняться при запуске:
 а) из файла .jl
+julia script.jl arg1 arg2 arg3
 б) из текста команды? (см. флаг -e)
+julia -e 'команда'
 =#
 
 #=

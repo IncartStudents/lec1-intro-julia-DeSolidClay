@@ -108,15 +108,16 @@ function test1(v)
     end
     return s
 end
-
+##
 x1 = randn(10_000)
-@time test1(x1);
 
 x2 = Vector{Any}(undef, 10_000)
 for i in 1:length(x2)
     x2[i] = x1[i]
 end
 
+@time Vector(x1)
+##
 @time test1(x2);
 
 # структуры
